@@ -42,7 +42,6 @@ class Optics {
 
       if (removedLine && !addedLine) addedLine = `[${i}]`
       if (!removedLine && addedLine) removedLine = `[${i}]`
-
       let addedPadding = (maxLineLength - addedLine.length)
       let removedPadding = (maxLineLength - removedLine.length)
 
@@ -70,15 +69,23 @@ class Optics {
    * @return {Integer} - the ammount of changes between the given strings
    */
   static diffLine (s, t) {
+    let additions = 0
+    let deletions = 0
     let changes = 0
 
     const totalCharacters = s.length > t.length ? s.length : t.length
 
     for (var i = 0; i < totalCharacters; i++) {
+      if (!s[i] && t[i]) additions += 1
+      if (s[i] && !t[i]) deletions += 1
       if (s[i] !== t[i]) changes += 1
     }
 
-    return changes
+    return {
+      additions,
+      deletions,
+      changes
+    }
   }
   /**
    * [diff description]
@@ -102,45 +109,6 @@ class Optics {
     const patchMap = this.patch.split('\n')
     const totalLines = Math.max(sourceMap.length, patchMap.length)
 
-    if (sourceMap.length === 1) {
-      const output = patchMap.map((l, i) => {
-        // update changes as well
-        changes.push(l.length)
-        // make sure we update the maxLineLength
-        if (maxLineLength < `[${i}]    ${l}`.length) {
-          maxLineLength = `[${i}]    ${l}`.length
-        }
-        return `[${i}] +  ${l}\n`
-      }).join('')
-
-      return {
-        changes,
-        combined: output,
-        added: output,
-        removed: '',
-        totalLines,
-        maxLineLength
-      }
-    }
-
-    if (patchMap.length === 1) {
-      const output = sourceMap.map((l, i) => {
-        // make sure we update the maxLineLength
-        if (maxLineLength < `[${i}]    ${l}`.length) {
-          maxLineLength = `[${i}]    ${l}`.length
-        }
-        return `[${i}] -  ${l}\n`
-      }).join('')
-
-      return {
-        combined: output,
-        removed: output,
-        added: '',
-        totalLines,
-        maxLineLength
-      }
-    }
-
     for (var i = 0; i < totalLines; i++) {
       if (patchMap[i] === undefined && sourceMap[i] === undefined) continue
 
@@ -148,18 +116,18 @@ class Optics {
       const oldLine = !sourceMap[i] ? '' : sourceMap[i]
       const change = Optics.diffLine(oldLine, newLine)
 
-      if (change === 0) {
-        changes.push(0)
+      // make sure we track the changes
+      changes.push(change)
 
+      if (change.changes === 0) {
         if (isCondensed) {
           if (tempRemoved && tempAdded) {
-            if (lastSignificantLine === 0) {
+            if (lastSignificantLine === 0 && padding > 0) {
               // we should make sure we put some padding around the beginning of the diff to give context
               const context = sourceMap.slice(i - (padding + 1), i - 1).map((l, li) => {
                 // make sure we update the maxLineLength
-                if (maxLineLength < `[${i}]    ${oldLine}`.length) {
-                  maxLineLength = `[${i}]    ${oldLine}`.length
-                }
+                if (maxLineLength < `[${i}]    ${l}`.length) maxLineLength = `[${i}]    ${l}`.length
+
                 return `[${(i - (padding + 1)) + li}]    ${l}\n`
               }).join('')
               combined = context + combined
@@ -184,16 +152,12 @@ class Optics {
         tempRemoved = ''
         tempAdded = ''
       } else {
-        changes.push(change)
         tempRemoved += `[${i}] -  ${oldLine}\n`
-        if (newLine) {
-          tempAdded += `[${i}] +  ${newLine}\n`
-        }
-      }
 
-      if (maxLineLength < `[${i}]    ${oldLine}`.length) {
-        maxLineLength = `[${i}]    ${oldLine}`.length
+        if (newLine) tempAdded += `[${i}] +  ${newLine}\n`
       }
+      if (maxLineLength < `[${i}] +  ${newLine}`.length) maxLineLength = `[${i}] +  ${newLine}`.length
+      if (maxLineLength < `[${i}]    ${oldLine}`.length) maxLineLength = `[${i}]    ${oldLine}`.length
     }
 
     combined += tempRemoved

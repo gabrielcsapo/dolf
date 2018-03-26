@@ -1,6 +1,6 @@
 {
   "name": "optics",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "🕶 diffing strings with expert vision",
   "main": "index.js",
   "scripts": {
